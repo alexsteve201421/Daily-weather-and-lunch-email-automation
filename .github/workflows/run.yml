@@ -17,5 +17,10 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Run your script
+      - name: Install dependencies
+        run: pip install requests
+       - name: Run your script
+        env:
+          OPENWEATHER_API_KEY: ${{ secrets.OPENWEATHER_API_KEY }}
+          CITY: "Irvine,US"
         run: python main.py
