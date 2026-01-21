@@ -24,3 +24,4 @@ jobs:
           OPENWEATHER_API_KEY: ${{ secrets.OPENWEATHER_API_KEY }}
           CITY: "Irvine,US"
         run: python main.py
+ 
