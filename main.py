@@ -9,7 +9,7 @@ CITY = os.getenv("CITY", "Irvine,US")
 API_KEY = os.environ["OPENWEATHER_API_KEY"]
 
 # --------------------
-# CURRENT WEATHER (only thing we can use right now)
+# GET CURRENT WEATHER
 # --------------------
 url = "https://api.openweathermap.org/data/2.5/weather"
 params = {
@@ -23,76 +23,51 @@ response.raise_for_status()
 data = response.json()
 
 temp = round(data["main"]["temp"])
-desc = data["weather"][0]["description"].lower()
+description = data["weather"][0]["description"].lower()
 
 # --------------------
-# TEMP BUCKET
+# DECIDE LUNCH (INTERNAL LOGIC ONLY)
 # --------------------
 if temp < 60:
-    temp_bucket = "Cool"
-elif temp < 75:
-    temp_bucket = "Mild"
-else:
-    temp_bucket = "Warm"
-
-# --------------------
-# SKY BUCKET (based on current description)
-# --------------------
-if any(word in desc for word in ["rain", "drizzle", "shower"]):
-    sky_bucket = "Rain"
-elif any(word in desc for word in ["overcast", "mist", "fog"]):
-    sky_bucket = "Overcast / Marine Layer"
-else:
-    sky_bucket = "Clear / Partly Cloudy"
-
-scenario = f"{temp_bucket} + {sky_bucket}"
-
-# --------------------
-# YOUR LUNCH LOGIC (1 option each)
-# --------------------
-if scenario == "Mild + Clear / Partly Cloudy":
-    lunch = "Bean and cheese burrito"
-elif scenario == "Warm + Clear / Partly Cloudy":
-    lunch = "Hummus sandwich"
-elif scenario == "Cool + Clear / Partly Cloudy":
     lunch = "Quesadilla"
-elif scenario == "Mild + Overcast / Marine Layer":
-    lunch = "Pasta"
-elif "Rain" in scenario:
-    lunch = "Surprise me"
+elif temp < 75:
+    if "cloud" in description or "mist" in description:
+        lunch = "Pasta"
+    else:
+        lunch = "Bean and cheese burrito"
 else:
-    lunch = "Surprise me"
+    if "clear" in description or "sun" in description:
+        lunch = "Hummus sandwich"
+    else:
+        lunch = "Surprise me"
 
 # --------------------
-# "EMAIL" (printed to Actions log for now)
+# BUILD EMAIL (NO WEATHER LOGIC MENTIONED)
 # --------------------
 today = datetime.now().strftime("%A, %B %d")
 
-subject = f"Good morning Milan — lunch plan for {today}"
+subject = f"Lunch idea for {today}"
 
-body = f"""
-Good morning Milan,
+email_body = f"""
+Good morning Mom,
 
-Here’s a quick check-in before the day gets going.
+I just wanted to send a quick lunch idea for today.
 
-Right now in {CITY.split(',')[0]}, it’s {temp}°F with {desc}.
-
-Based on that, today’s lunch plan is:
+For lunch, how about:
 ➡️ {lunch}
 
-Have a great day at school — hope lunch hits the spot.
+Totally flexible of course — just a suggestion 😊
 
 Love,
-Dad
+Milan
 """
 
-print("====== EMAIL PREVIEW (NOT SENT YET) ======")
+# --------------------
+# OUTPUT (EMAIL PREVIEW)
+# --------------------
+print("====== EMAIL PREVIEW (NOT SENT) ======")
 print("Subject:", subject)
-print(body)
-print("=========================================")
-print(f"Scenario: {scenario}")
-print(f"Lunch: {lunch}")
-
-
+print(email_body)
+print("====================================")
 
 
