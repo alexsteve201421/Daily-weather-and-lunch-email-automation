@@ -46,7 +46,33 @@ else:
     sky_bucket = "Clear / Partly Cloudy"
 
 scenario = f"{temp_bucket} + {sky_bucket}"
+# ----- EMAIL CONTENT -----
 
-print(f"Weather for {CITY}: {temp}°F, {description}")
-print(f"Scenario: {scenario}")
+subject = "Today’s Weather & Lunch Plan ☀️🌯"
+
+email_body = f"""
+Hi Milan,
+
+Good morning! Here’s a quick look at today’s weather and lunch plan.
+
+Today in {CITY}, it’s about {temp}°F with {description.replace('_', ' ')} —
+a pretty {temp_bucket.lower()} and comfortable day.
+
+Based on that, today’s lunch suggestion is:
+
+🍽️ {lunch}
+
+Have a great day!
+
+—
+Milan
+"""
+
+# Print email (shows in GitHub Actions logs for now)
+print("Subject:", subject)
+print()
+print(email_body)
+
+
+
 
