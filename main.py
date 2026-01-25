@@ -132,7 +132,7 @@ subject = f"Daily Weather + Lunch — {CITY.split(',')[0]}"
 date_str = now_local.strftime("%A, %B %d")
 time_str = now_local.strftime("%I:%M %p").lstrip("0")
 
-body = f"""Hi Mom,
+body = f"""Hi Mommy,
 
 Here’s today’s quick update for {CITY}:
 
