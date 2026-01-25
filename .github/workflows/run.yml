@@ -3,7 +3,7 @@ name: Test run
 on:
   workflow_dispatch:
   schedule:
-    - cron: "0 15 * * *"
+    - cron: "0 15 * * 1-5"   # Weekdays at 15:00 UTC (≈ 7am Pacific during standard time)
 
 jobs:
   run:
@@ -25,6 +25,10 @@ jobs:
         env:
           OPENWEATHER_API_KEY: ${{ secrets.OPENWEATHER_API_KEY }}
           CITY: "Irvine,US"
+          EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
+          EMAIL_TO: ${{ secrets.EMAIL_TO }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
         run: python main.py
 
+  
  
