@@ -1,166 +1,193 @@
 import os
-import requests
 import smtplib
 import ssl
-import datetime
 from email.message import EmailMessage
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
-# -----------------------------
-# SETTINGS (read from env)
-# -----------------------------
+import requests
+
+# ---------------------------
+# Settings (via GitHub Actions env/secrets)
+# ---------------------------
 CITY = os.getenv("CITY", "Irvine,US")
+API_KEY = os.environ.get("OPENWEATHER_API_KEY", "")
 
-OPENWEATHER_API_KEY = os.getenv("OPENWEATHER_API_KEY", "")
-EMAIL_FROM = os.getenv("EMAIL_FROM", "")
-EMAIL_TO = os.getenv("EMAIL_TO", "")
-GMAIL_APP_PASSWORD = os.getenv("GMAIL_APP_PASSWORD", "")
+EMAIL_FROM = os.environ.get("EMAIL_FROM", "")
+# Put multiple emails in EMAIL_TO separated by commas:
+# e.g. "mom@gmail.com,dad@gmail.com,person3@gmail.com"
+EMAIL_TO_RAW = os.environ.get("EMAIL_TO", "")
 
-# Weekend override for testing
-# Set in Actions env as: FORCE_SEND: "true"
-FORCE_SEND = os.getenv("FORCE_SEND", "false").lower() == "true"
+GMAIL_APP_PASSWORD = os.environ.get("GMAIL_APP_PASSWORD", "")
 
+# Optional: set to "1" to allow sending on weekends for testing
+OVERRIDE_WEEKEND = os.getenv("OVERRIDE_WEEKEND", "0") == "1"
 
-# -----------------------------
-# 1) WEEKDAY / WEEKEND LOGIC
-# -----------------------------
-now_local = datetime.datetime.now()
-is_weekend = now_local.weekday() >= 5  # 5=Sat, 6=Sun
+# Optional: customize signature name (defaults to "Milan" per your request)
+SIGNATURE_NAME = os.getenv("SIGNATURE_NAME", "Milan")
 
-if is_weekend and not FORCE_SEND:
-    print("Weekend detected (local). Skipping email.")
-    raise SystemExit(0)
-
-
-# -----------------------------
-# 2) GET CURRENT WEATHER
-# -----------------------------
-if not OPENWEATHER_API_KEY:
-    raise ValueError("Missing OPENWEATHER_API_KEY environment variable.")
-
-url = "https://api.openweathermap.org/data/2.5/weather"
-params = {
-    "q": CITY,
-    "appid": OPENWEATHER_API_KEY,
-    "units": "imperial",
-}
-
-response = requests.get(url, params=params, timeout=20)
-response.raise_for_status()
-data = response.json()
-
-temp_f = round(data["main"]["temp"])
-description = data["weather"][0]["description"].lower()
+# ---------------------------
+# Helpers
+# ---------------------------
+def parse_recipients(raw: str) -> list[str]:
+    """
+    Accepts a comma-separated list of emails.
+    Returns a cleaned list (no blanks).
+    """
+    return [e.strip() for e in raw.split(",") if e.strip()]
 
 
-# -----------------------------
-# 3) CLASSIFY WEATHER INTO BUCKETS
-# -----------------------------
-# Temperature bucket
-if temp_f < 60:
-    temp_bucket = "Cool"
-elif temp_f < 75:
-    temp_bucket = "Mild"
-else:
-    temp_bucket = "Warm"
-
-# Sky bucket
-rain_words = ["rain", "drizzle", "thunderstorm", "shower"]
-marine_words = ["mist", "fog", "haze"]
-overcast_words = ["overcast", "cloud", "clouds"]
-
-if any(w in description for w in rain_words):
-    sky_bucket = "Rain"
-elif any(w in description for w in marine_words):
-    sky_bucket = "Overcast / Marine Layer"
-elif any(w in description for w in overcast_words):
-    # If it’s cloudy but not marine/fog, treat as partly cloudy/overcast bucket
-    sky_bucket = "Clear / Partly Cloudy"
-else:
-    sky_bucket = "Clear / Partly Cloudy"
-
-scenario = f"{temp_bucket} + {sky_bucket}"
+def is_weekday_local(tz_name: str = "America/Los_Angeles") -> bool:
+    """
+    Uses a real timezone so DST is handled automatically.
+    Monday=0 ... Sunday=6
+    """
+    now_local = datetime.now(ZoneInfo(tz_name))
+    return now_local.weekday() < 5
 
 
-# -----------------------------
-# 4) LUNCH LOGIC (BASED ON WEATHER)
-# Your exact mapping:
-# Mild + Clear/Partly Cloudy = bean and cheese burrito
-# Warm + Clear/Sunny = hummus sandwich
-# Cool + Clear/Cloudy = quesadilla
-# Mild + Overcast/Marine Layer = pasta
-# Mild + Rain = surprise me
-# -----------------------------
-def choose_lunch(temp_bucket: str, sky_bucket: str) -> str:
-    # Warm + Clear / Partly Cloudy -> hummus sandwich
-    if temp_bucket == "Warm" and sky_bucket == "Clear / Partly Cloudy":
-        return "Hummus sandwich"
+def get_current_weather(city: str, api_key: str) -> tuple[int, str]:
+    """
+    Returns (temp_f_rounded, description_lower).
+    """
+    if not api_key:
+        raise RuntimeError("OPENWEATHER_API_KEY is missing.")
 
-    # Mild + Clear / Partly Cloudy -> bean and cheese burrito
-    if temp_bucket == "Mild" and sky_bucket == "Clear / Partly Cloudy":
+    url = "https://api.openweathermap.org/data/2.5/weather"
+    params = {"q": city, "appid": api_key, "units": "imperial"}
+
+    r = requests.get(url, params=params, timeout=20)
+    r.raise_for_status()
+    data = r.json()
+
+    temp_f = round(data["main"]["temp"])
+    description = data["weather"][0]["description"].lower()
+    return temp_f, description
+
+
+def choose_lunch(temp_f: int, description: str) -> str:
+    """
+    Your fixed mapping (one option per combo).
+    """
+    desc = description.lower()
+
+    # --- Sky bucket ---
+    rain_words = ("rain", "drizzle", "thunder", "storm", "shower")
+    if any(w in desc for w in rain_words):
+        sky = "Rain"
+    else:
+        # Treat fog/mist/haze as marine layer-ish
+        marine_words = ("mist", "fog", "haze")
+        if any(w in desc for w in marine_words):
+            sky = "Marine Layer"
+        else:
+            # Cloudiness bucket
+            if "overcast" in desc or ("cloud" in desc and "broken" in desc):
+                sky = "Overcast"
+            elif "cloud" in desc:
+                sky = "Partly Cloudy"
+            else:
+                sky = "Clear"
+
+    # --- Temp bucket ---
+    if temp_f < 60:
+        temp_bucket = "Cool"
+    elif temp_f < 75:
+        temp_bucket = "Mild"
+    else:
+        temp_bucket = "Warm"
+
+    # --- Map to lunch (your requested combos) ---
+    # Mild + Clear/Partly Cloudy = bean and cheese burrito
+    if temp_bucket == "Mild" and sky in ("Clear", "Partly Cloudy"):
         return "Bean and cheese burrito"
 
-    # Mild + Overcast / Marine Layer -> pasta
-    if temp_bucket == "Mild" and sky_bucket == "Overcast / Marine Layer":
-        return "Pasta"
+    # Warm + Clear/Sunny = hummus sandwich
+    if temp_bucket == "Warm" and sky == "Clear":
+        return "Hummus sandwich"
 
-    # Mild + Rain -> surprise me
-    if temp_bucket == "Mild" and sky_bucket == "Rain":
-        return "Surprise me"
-
-    # Cool + (anything not rain) -> quesadilla
-    if temp_bucket == "Cool" and sky_bucket != "Rain":
+    # Cool + Clear/Cloudy = quesadilla
+    if temp_bucket == "Cool" and sky in ("Clear", "Partly Cloudy", "Overcast"):
         return "Quesadilla"
 
-    # Fallback
-    return "Surprise me"
+    # Mild + Overcast/Marine Layer = pasta
+    if temp_bucket == "Mild" and sky in ("Overcast", "Marine Layer"):
+        return "Pasta"
+
+    # Mild + Rain = surprise me
+    if temp_bucket == "Mild" and sky == "Rain":
+        return "Surprise me"
+
+    # Fallbacks (in case Irvine does something weird)
+    if sky == "Rain":
+        return "Surprise me"
+    if temp_bucket == "Warm":
+        return "Hummus sandwich"
+    if temp_bucket == "Cool":
+        return "Quesadilla"
+    return "Bean and cheese burrito"
 
 
-lunch = choose_lunch(temp_bucket, sky_bucket)
+def build_email(subject: str, body_text: str, sender: str, recipients: list[str]) -> EmailMessage:
+    msg = EmailMessage()
+    msg["From"] = sender
+    msg["To"] = ", ".join(recipients)  # multiple recipients
+    msg["Subject"] = subject
+    msg.set_content(body_text)
+    return msg
 
 
-# -----------------------------
-# 5) BUILD A REAL EMAIL + SEND
-# -----------------------------
-if not EMAIL_FROM or not EMAIL_TO or not GMAIL_APP_PASSWORD:
-    raise ValueError(
-        "Missing one or more email env vars: EMAIL_FROM, EMAIL_TO, GMAIL_APP_PASSWORD"
+def send_email_gmail(sender: str, app_password: str, msg: EmailMessage) -> None:
+    if not sender or not app_password:
+        raise RuntimeError("EMAIL_FROM or GMAIL_APP_PASSWORD missing.")
+
+    context = ssl.create_default_context()
+    with smtplib.SMTP_SSL("smtp.gmail.com", 465, context=context) as server:
+        server.login(sender, app_password)
+        server.send_message(msg)
+
+
+# ---------------------------
+# Main
+# ---------------------------
+def main():
+    recipients = parse_recipients(EMAIL_TO_RAW)
+    if not recipients:
+        raise RuntimeError("EMAIL_TO is missing or empty (use comma-separated emails).")
+
+    # Weekday check (DST-safe)
+    if not OVERRIDE_WEEKEND and not is_weekday_local("America/Los_Angeles"):
+        print("Weekend detected (local). Skipping email.")
+        return
+
+    # Get current weather (at send time)
+    temp_f, desc = get_current_weather(CITY, API_KEY)
+
+    lunch = choose_lunch(temp_f, desc)
+
+    # “Real email” style
+    subject = "Today’s weather + lunch"
+    body = (
+        f"Hi,\n\n"
+        f"Here’s today’s quick update:\n\n"
+        f"Weather in {CITY}: {temp_f}°F, {desc}\n"
+        f"Lunch idea: {lunch}\n\n"
+        f"Have a great day.\n\n"
+        f"– {SIGNATURE_NAME}\n"
+        f"Milan\n"
     )
 
-# Friendly subject + body (real email)
-subject = f"Daily Weather + Lunch — {CITY.split(',')[0]}"
+    msg = build_email(subject, body, EMAIL_FROM, recipients)
+    send_email_gmail(EMAIL_FROM, GMAIL_APP_PASSWORD, msg)
 
-date_str = now_local.strftime("%A, %B %d")
-time_str = now_local.strftime("%I:%M %p").lstrip("0")
+    print("Email sent successfully.")
+    print(f"Weather: {temp_f}F, {desc}")
+    print(f"Lunch: {lunch}")
+    print(f"Sent to: {', '.join(recipients)}")
 
-body = f"""Hi Mommy,
 
-Here’s today’s quick update for {CITY}:
-
-Weather right now: {temp_f}°F, {description}
-Category: {scenario}
-
-Lunch idea for today: {lunch}
-
-Love,
-Milan
-"""
-
-msg = EmailMessage()
-msg["From"] = EMAIL_FROM
-msg["To"] = EMAIL_TO
-msg["Subject"] = subject
-msg.set_content(body)
-
-context = ssl.create_default_context()
-
-with smtplib.SMTP_SSL("smtp.gmail.com", 465, context=context) as server:
-    server.login(EMAIL_FROM, GMAIL_APP_PASSWORD)
-    server.send_message(msg)
-
-print("Email sent successfully.")
-print(f"Weather: {temp_f}F, {description}")
-print(f"Scenario: {scenario}")
-print(f"Lunch: {lunch}")
+if __name__ == "__main__":
+    main()
 
 
 
