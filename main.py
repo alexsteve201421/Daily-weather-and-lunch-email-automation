@@ -17,7 +17,7 @@ GMAIL_APP_PASSWORD = os.getenv("GMAIL_APP_PASSWORD", "")
 
 # Weekend override for testing
 # Set in Actions env as: FORCE_SEND: "true"
-FORCE_SEND = os.getenv("FORCE_SEND", "false").lower() == "true"
+FORCE_SEND = os.getenv("FORCE_SEND", "true").lower() == "true"
 
 
 # -----------------------------
