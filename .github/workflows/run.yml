@@ -3,7 +3,7 @@ name: Test run
 on:
   workflow_dispatch:
   schedule:
-    - cron: "0 15 * * 1-5"   # Weekdays at 15:00 UTC (≈ 7am Pacific during standard time)
+    - cron: "0 14 * * 1-5"   # Weekdays at 15:00 UTC (≈ 6am Pacific during standard time)
 
 jobs:
   run:
