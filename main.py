@@ -168,13 +168,13 @@ def main():
     # “Real email” style
     subject = "Today’s weather + lunch"
     body = (
-        f"Hi,\n\n"
+        f"Hi,mommy\n\n"
         f"Here’s today’s quick update:\n\n"
         f"Weather in {CITY}: {temp_f}°F, {desc}\n"
         f"Lunch idea: {lunch}\n\n"
         f"Have a great day.\n\n"
         f"– {SIGNATURE_NAME}\n"
-        f"Milan\n"
+       
     )
 
     msg = build_email(subject, body, EMAIL_FROM, recipients)
