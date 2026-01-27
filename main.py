@@ -22,6 +22,10 @@ SIGNATURE_NAME = os.getenv("SIGNATURE_NAME", "Milan")
 FORCE_SEND = os.getenv("FORCE_SEND", "false").lower() == "true"
 
 LOCAL_TZ = ZoneInfo("America/Los_Angeles")
+now_la = datetime.now(LOCAL_TZ)
+formatted_date = now_la.strftime("%A, %B %d, %Y")
+
+
 
 # =========================
 # HELPERS
