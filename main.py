@@ -128,11 +128,11 @@ def main():
     noon_temp, noon_desc, noon_time = get_noon_forecast()
     lunch = choose_lunch(noon_temp, noon_desc)
 
-    subject = "Today’s Weather & Lunch"
+    subject = f"Today’s Weather & Lunch - {formatted_date}"
 
     body = (
         f"Hi, mommy\n\n"
-        f"Here’s today’s quick update for {formatted date}:\n\n"
+        f"Here’s today’s quick update:\n\n"
         f"Weather in {CITY}: {temp_f}°F, {desc}\n"
         f"Lunch idea: {lunch}\n\n"
         f"Have a great day.\n\n"
@@ -159,5 +159,6 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
