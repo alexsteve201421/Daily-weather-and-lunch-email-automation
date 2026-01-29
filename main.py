@@ -135,7 +135,7 @@ def main():
     subject = f"Today’s Weather & Lunch - {formatted_date}"
 
     body = (
-        f"Hi, mommy\n\n"
+        f"Hi mommy,\n\n"
         f"Here’s today’s quick update:\n\n"
         f"Weather in {CITY}: {temp_f}°F, {desc}\n"
         f"Lunch idea: {lunch}\n\n"
